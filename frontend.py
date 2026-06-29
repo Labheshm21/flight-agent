@@ -1,8 +1,11 @@
 import os
+from uuid import uuid4
+
 import streamlit as st
 from datetime import datetime
 from langchain_core.messages import HumanMessage
 from main import app
+from tools.aws_tool import log_travel_event, save_travel_plan_record
 
 st.set_page_config(
     page_title="AI Travel Booking System",
@@ -305,7 +308,7 @@ with st.sidebar:
     st.markdown("<div class='sidebar-title'>🌍 AI Travel Planner</div>", unsafe_allow_html=True)
     st.markdown("---")
 
-    thread_id = st.text_input("👤 User ID", value="aarohi_user",
+    thread_id = st.text_input("👤 User ID", value="Labhesh Mahajan",
                               help="Your session ID — keeps travel history across queries")
 
     st.markdown("<div class='sidebar-title'>Powered by</div>", unsafe_allow_html=True)
@@ -450,6 +453,7 @@ if generate:
 
         # Save
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        plan_id = str(uuid4())
         filename = f"travel_plan_{timestamp}.md"
         save_dir = os.path.join(os.path.dirname(__file__), "travel_plans")
         os.makedirs(save_dir, exist_ok=True)
@@ -485,11 +489,34 @@ if generate:
         with open(os.path.join(save_dir, filename), "w", encoding="utf-8") as f:
             f.write(file_content)
 
+        dynamodb_ok, dynamodb_msg = save_travel_plan_record(
+            plan_id=plan_id,
+            user_id=thread_id,
+            query=user_query,
+            filename=filename,
+            file_content=file_content,
+            collected=collected,
+        )
+        cloudwatch_ok, cloudwatch_msg = log_travel_event(
+            "travel_plan_generated",
+            {
+                "plan_id": plan_id,
+                "user_id": thread_id,
+                "query": user_query,
+                "filename": filename,
+                "llm_calls": collected["llm_calls"],
+                "dynamodb_saved": dynamodb_ok,
+            },
+        )
+
         dl_col, info_col = st.columns([1, 3])
         with dl_col:
             st.download_button("⬇️ Download Plan", data=file_content,
                                file_name=filename, mime="text/markdown",
                                use_container_width=True)
         with info_col:
-            st.markdown(f"<div class='save-bar'>📁 Auto-saved → <code>travel_plans/{filename}</code></div>",
+            aws_status = []
+            aws_status.append("DynamoDB: saved" if dynamodb_ok else f"DynamoDB: {dynamodb_msg}")
+            aws_status.append("CloudWatch: logged" if cloudwatch_ok else f"CloudWatch: {cloudwatch_msg}")
+            st.markdown(f"<div class='save-bar'>📁 Auto-saved → <code>travel_plans/{filename}</code><br>☁️ {' | '.join(aws_status)}</div>",
                         unsafe_allow_html=True)
