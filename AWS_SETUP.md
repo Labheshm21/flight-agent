@@ -80,4 +80,38 @@ Open port `8501` in the EC2 security group, then visit:
 http://EC2_PUBLIC_IP:8501
 ```
 
-For a longer-running deployment, run Streamlit through `systemd`, `tmux`, or `screen`.
+For a longer-running deployment, run Streamlit through `systemd`.
+
+## 6. Run Streamlit with systemd
+
+Copy the included service file into place:
+
+```bash
+cd ~/flight-agent
+sudo cp deploy/travel-app.service /etc/systemd/system/travel-app.service
+sudo systemctl daemon-reload
+sudo systemctl enable travel-app
+sudo systemctl start travel-app
+sudo systemctl status travel-app
+```
+
+Useful commands:
+
+```bash
+sudo systemctl restart travel-app
+sudo journalctl -u travel-app -f
+```
+
+## 7. GitHub Actions CI/CD
+
+The workflow in `.github/workflows/deploy-ec2.yml` deploys every push to `main` onto EC2.
+
+Add these GitHub repository secrets:
+
+```text
+EC2_HOST=18.224.23.171
+EC2_USER=ubuntu
+EC2_SSH_KEY=<contents of your flightagent.pem file>
+```
+
+The workflow uploads the latest code, keeps `.env`, `.venv`, and `travel_plans/` untouched on EC2, installs dependencies, installs the `systemd` service, and restarts the `travel-app` service.

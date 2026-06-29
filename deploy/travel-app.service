@@ -1,0 +1,16 @@
+[Unit]
+Description=AI Travel Booking Streamlit app
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/flight-agent
+Environment=PATH=/home/ubuntu/flight-agent/.venv/bin
+ExecStart=/home/ubuntu/flight-agent/.venv/bin/streamlit run frontend.py --server.address 0.0.0.0 --server.port 8501
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
